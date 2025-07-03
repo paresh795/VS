@@ -19,7 +19,7 @@ const faqs = [
   {
     question: "How do I get started?",
     answer:
-      "Simply clone the repository from GitHub, copy the .env.example to .env.local, add your API keys, run npm install, and you're ready to go. The whole process takes less than 5 minutes."
+      "Simply clone the repository from GitHub, copy the .env.example to .env.local, add your API keys, run pnpm install, and you're ready to go. The whole process takes less than 5 minutes."
   },
   {
     question: "Is this really free?",

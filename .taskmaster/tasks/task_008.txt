@@ -1,0 +1,160 @@
+# Task ID: 8
+# Title: Implement Credits System and Stripe Integration
+# Status: pending
+# Dependencies: 1, 12
+# Priority: high
+# Description: Create the credits ledger system and integrate Stripe for metered billing to allow users to purchase credit bundles.
+# Details:
+1. Create credits table and functions:
+   ```typescript
+   // lib/credits.ts
+   export async function getUserCredits(userId) {
+     const result = await db.select()
+       .from(credits)
+       .where(eq(credits.userId, userId));
+     
+     return result[0]?.balance || 0;
+   }
+   
+   export async function deductCredits(userId, amount) {
+     // Start transaction
+     return await db.transaction(async (tx) => {
+       const userCredits = await tx.select()
+         .from(credits)
+         .where(eq(credits.userId, userId));
+       
+       if (!userCredits[0] || userCredits[0].balance < amount) {
+         return { success: false };
+       }
+       
+       await tx.update(credits)
+         .set({ 
+           balance: userCredits[0].balance - amount,
+           updatedAt: new Date()
+         })
+         .where(eq(credits.userId, userId));
+       
+       return { success: true, newBalance: userCredits[0].balance - amount };
+     });
+   }
+   ```
+2. Set up Stripe integration:
+   - Configure Stripe metered billing product
+   - Create credit bundle (2,000 credits = $19.90)
+   - Implement Stripe Checkout
+3. Create API routes for credit management:
+   ```typescript
+   // pages/api/credits/purchase.ts
+   export default async function handler(req, res) {
+     const { user } = await getAuth(req);
+     if (!user) return res.status(401).json({ error: 'Unauthorized' });
+     
+     const { bundle } = req.body; // 'standard' = 2000 credits
+     
+     // Create Stripe checkout session
+     const session = await stripe.checkout.sessions.create({
+       customer_email: user.email,
+       line_items: [
+         {
+           price: process.env.STRIPE_CREDIT_BUNDLE_PRICE_ID,
+           quantity: 1,
+         },
+       ],
+       mode: 'payment',
+       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard?success=true`,
+       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard?canceled=true`,
+       metadata: {
+         userId: user.id,
+         bundle: 'standard',
+         credits: 2000
+       }
+     });
+     
+     return res.status(200).json({ url: session.url });
+   }
+   
+   // pages/api/webhook/stripe.ts - Handle successful payments
+   export default async function handler(req, res) {
+     const sig = req.headers['stripe-signature'];
+     let event;
+     
+     try {
+       event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+     } catch (err) {
+       return res.status(400).send(`Webhook Error: ${err.message}`);
+     }
+     
+     if (event.type === 'checkout.session.completed') {
+       const session = event.data.object;
+       
+       // Add credits to user account
+       await db.transaction(async (tx) => {
+         const userCredits = await tx.select()
+           .from(credits)
+           .where(eq(credits.userId, session.metadata.userId));
+         
+         if (userCredits.length === 0) {
+           await tx.insert(credits).values({
+             userId: session.metadata.userId,
+             balance: parseInt(session.metadata.credits),
+             updatedAt: new Date()
+           });
+         } else {
+           await tx.update(credits)
+             .set({ 
+               balance: userCredits[0].balance + parseInt(session.metadata.credits),
+               updatedAt: new Date()
+             })
+             .where(eq(credits.userId, session.metadata.userId));
+         }
+       });
+     }
+     
+     return res.status(200).json({ received: true });
+   }
+   ```
+4. Create credits dashboard UI
+   - Show current balance
+   - Display usage history
+   - Add "Buy Credits" button
+
+# Test Strategy:
+1. Test credit balance retrieval and updates
+2. Verify credit deduction logic with concurrent requests
+3. Test Stripe checkout flow
+4. Verify webhook handling for successful payments
+5. Test credit bundle purchase and balance update
+6. Verify transaction history display
+7. Test error handling for insufficient credits
+
+# Subtasks:
+## 1. Create Credits Database Schema and Models [pending]
+### Dependencies: None
+### Description: Design and implement the database schema for the credits system, including tables for credit balances and transaction history.
+### Details:
+Create a credits table with fields for userId, balance, and timestamps. Also create a credit_transactions table to log all credit-related activities (purchases, usage). Implement the database schema using Drizzle ORM and create the necessary TypeScript interfaces. Implement core functions for credit management like getUserCredits(), deductCredits(), and addCredits().
+
+## 2. Configure Stripe Products and Pricing [pending]
+### Dependencies: 8.1
+### Description: Set up the necessary products and pricing configurations in the Stripe dashboard for credit bundles.
+### Details:
+Create a new product in Stripe called 'Credits Bundle'. Set up a price for the standard bundle (2,000 credits = $19.90) with one-time payment mode. Store the price ID in environment variables. Document the product and price IDs for use in the integration code.
+
+## 3. Implement Stripe Checkout Integration [pending]
+### Dependencies: 8.1, 8.2
+### Description: Create the API endpoint for initiating credit purchases and redirecting users to Stripe Checkout.
+### Details:
+Implement the /api/credits/purchase endpoint that creates a Stripe checkout session. Include user information and bundle details in the session metadata. Configure success and cancel URLs. Return the checkout URL to the client for redirection. Add client-side code to trigger the purchase flow and handle redirects.
+
+## 4. Implement Stripe Webhook Handler [pending]
+### Dependencies: 8.1, 8.3
+### Description: Create a webhook endpoint to process successful payments and add credits to user accounts.
+### Details:
+Implement the /api/webhook/stripe endpoint to handle Stripe events. Verify webhook signatures for security. Process 'checkout.session.completed' events to add purchased credits to the user's balance. Implement transaction handling to ensure data consistency. Add logging for webhook events for debugging and auditing.
+
+## 5. Build Credits Dashboard UI [pending]
+### Dependencies: 8.1, 8.3, 8.4
+### Description: Create a user interface for displaying credit balance, purchase history, and initiating new purchases.
+### Details:
+Design and implement a credits section in the user dashboard. Display current credit balance prominently. Show a table of credit transactions (purchases and usage) with dates and amounts. Add a 'Buy Credits' button that initiates the Stripe checkout flow. Implement real-time or polling updates of credit balance after purchases. Add visual feedback for successful purchases when redirected from Stripe.
+

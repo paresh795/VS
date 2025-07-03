@@ -1,24 +1,9 @@
-import { config } from "dotenv"
-import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js"
+import { drizzle } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
-import { customers } from "./schema/customers"
+import * as schema from "./schema"
 
-config({ path: ".env.local" })
+const connectionString = process.env.DATABASE_URL!
 
-const databaseUrl = process.env.DATABASE_URL
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is not set")
-}
-
-const dbSchema = {
-  // tables
-  customers
-  // relations
-}
-
-function initializeDb(url: string) {
-  const client = postgres(url, { prepare: false })
-  return drizzlePostgres(client, { schema: dbSchema })
-}
-
-export const db = initializeDb(databaseUrl)
+// Disable prefetch as it is not supported for "Transaction" pool mode
+export const client = postgres(connectionString, { prepare: false })
+export const db = drizzle(client, { schema })

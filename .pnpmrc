@@ -1,0 +1,22 @@
+# pnpm configuration for Next.js SaaS template
+
+# Strict peer dependencies to prevent phantom dependencies
+strict-peer-dependencies=false
+
+# Auto install peers for convenience 
+auto-install-peers=true
+
+# Use faster linking
+prefer-offline=true
+
+# Enable shamefully hoist for better Next.js compatibility
+shamefully-hoist=false
+
+# Node modules structure
+node-linker=isolated
+
+# Registry settings
+registry=https://registry.npmjs.org/
+
+# Save exact versions for better reproducibility
+save-exact=true 

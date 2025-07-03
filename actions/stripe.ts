@@ -6,7 +6,7 @@ import {
   updateCustomerByStripeCustomerId,
   updateCustomerByUserId
 } from "@/actions/customers"
-import { SelectCustomer } from "@/db/schema/customers"
+import { SelectCustomer } from "@/db/schema"
 import { stripe } from "@/lib/stripe"
 import { auth } from "@clerk/nextjs/server"
 import Stripe from "stripe"

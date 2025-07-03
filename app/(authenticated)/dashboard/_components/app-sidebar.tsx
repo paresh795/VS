@@ -1,6 +1,17 @@
 "use client"
 
-import { Link, Settings2, User, Users } from "lucide-react"
+import { 
+  Link, 
+  Settings2, 
+  User, 
+  Users, 
+  Home, 
+  Palette, 
+  Image, 
+  CreditCard,
+  HelpCircle,
+  TestTube 
+} from "lucide-react"
 import * as React from "react"
 
 import {
@@ -13,6 +24,7 @@ import {
 import { NavMain } from "../_components/nav-main"
 import { NavUser } from "../_components/nav-user"
 import { TeamSwitcher } from "../_components/team-switcher"
+import { CreditsDisplay } from "@/components/ui/credits-display"
 
 export function AppSidebar({
   userData,
@@ -48,54 +60,19 @@ export function AppSidebar({
         logo: Users,
         plan: "Team"
       }
-    ],
-    navMain: [
-      {
-        title: "Nav Item 1",
-        url: "#",
-        icon: Link,
-        items: [
-          {
-            title: "Sub Item 1",
-            url: "/dashboard/nav-item-1"
-          },
-          {
-            title: "Sub Item 2",
-            url: "/dashboard/nav-item-2"
-          }
-        ]
-      },
-      {
-        title: "Nav Item 2",
-        url: "#",
-        icon: Link,
-        items: [
-          {
-            title: "Sub Item 1",
-            url: "/dashboard/nav-item-1"
-          }
-        ]
-      },
-      {
-        title: "Settings",
-        url: "#",
-        icon: Settings2,
-        items: [
-          {
-            title: "General",
-            url: "/dashboard/settings"
-          }
-        ]
-      }
     ]
   }
+  
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <TeamSwitcher teams={data.teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain />
+        <div className="mt-auto p-4">
+          <CreditsDisplay variant="compact" />
+        </div>
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />

@@ -1,0 +1,55 @@
+# Task ID: 12
+# Title: Implement Professional-Grade State Management Architecture
+# Status: done
+# Dependencies: 1
+# Priority: high
+# Description: Design and implement a robust state management architecture using Zustand for global state, React Query for server state, and real-time synchronization to support Virtual Staging SaaS at scale.
+# Details:
+1. Set up a global Zustand store to manage user credits, job processing states, and workflow management. Structure the store to support concurrent job tracking, credit deduction, and workflow state transitions. Use selectors and middleware for state normalization and memoization to optimize performance.
+2. Integrate React Query for all server state: configure queries and mutations for job status, credit balance, and workflow data. Enable caching, optimistic updates, and error handling strategies. Use query invalidation and refetching to keep UI in sync with backend changes.
+3. Implement real-time synchronization for job status and credits using a combination of webhook event handlers (for backend-initiated updates) and polling (for fallback and periodic refresh). Ensure that updates from webhooks or polling are merged into the Zustand store and React Query cache without race conditions.
+4. Add state persistence for workflow recovery and user preferences using localStorage or IndexedDB, with hydration logic on app load. Ensure that in-progress jobs and user settings are restored after reloads or crashes.
+5. Integrate comprehensive error boundaries at the component level and global error state management in Zustand. Implement rollback logic for failed optimistic updates and provide user feedback for recoverable and unrecoverable errors.
+6. Profile and optimize state access patterns, using selectors, memoized hooks, and normalized data structures to minimize unnecessary re-renders and ensure scalability under high usage.
+7. Provide reusable hooks (e.g., useCredits, useJobStatus, useWorkflow) that abstract away state logic for use across the app.
+
+# Test Strategy:
+- Write unit and integration tests for Zustand store logic, including concurrent job processing, credit deduction, and workflow transitions.
+- Test React Query integration: verify caching, optimistic updates, error handling, and query invalidation.
+- Simulate real-time updates via webhooks and polling; ensure UI reflects job and credit changes instantly and without duplication.
+- Test state persistence by simulating reloads and crashes; verify workflow and preferences are restored correctly.
+- Inject errors at various points (API failures, network issues, optimistic update rollbacks) and verify error boundaries and recovery logic.
+- Use React DevTools and profiling tools to measure re-render counts and state update performance under load.
+- Conduct end-to-end tests covering concurrent job processing, credit management, workflow preservation, and real-time UI updates.
+
+# Subtasks:
+## 1. Design and Implement Zustand Global Store [done]
+### Dependencies: None
+### Description: Create a modular Zustand store to manage user credits, job processing states, and workflow management. Structure the store for concurrent job tracking, credit deduction, and workflow state transitions. Integrate selectors and middleware for state normalization and memoization.
+### Details:
+Define state slices for credits, jobs, and workflows. Use middleware for logging, persistence, and performance optimizations. Ensure the store supports concurrent updates and is scalable for SaaS usage.
+
+## 2. Integrate React Query for Server State Management [done]
+### Dependencies: 12.1
+### Description: Set up React Query to handle all server state, including job status, credit balance, and workflow data. Configure queries and mutations with caching, optimistic updates, error handling, and query invalidation.
+### Details:
+Define query keys and mutation hooks for each server-side resource. Implement strategies for cache invalidation and refetching to keep the UI in sync with backend changes.
+
+## 3. Implement Real-Time Synchronization Mechanisms [done]
+### Dependencies: 12.2
+### Description: Develop real-time synchronization for job status and credits using webhook event handlers and polling as a fallback. Ensure updates are merged into the Zustand store and React Query cache without race conditions.
+### Details:
+Set up listeners for webhook events and periodic polling. Implement logic to reconcile incoming updates with local state, handling potential conflicts and ensuring consistency.
+
+## 4. Add State Persistence and Recovery [done]
+### Dependencies: 12.1
+### Description: Implement state persistence for workflow recovery and user preferences using localStorage or IndexedDB. Add hydration logic to restore in-progress jobs and user settings after reloads or crashes.
+### Details:
+Integrate persistence middleware with Zustand. Ensure seamless hydration on app load and handle edge cases for incomplete or corrupted state.
+
+## 5. Integrate Error Boundaries and Global Error State Management [done]
+### Dependencies: 12.2, 12.4
+### Description: Add comprehensive error boundaries at the component level and manage global error state in Zustand. Implement rollback logic for failed optimistic updates and provide user feedback for errors.
+### Details:
+Wrap key components with error boundaries. Use Zustand to track global error states and trigger UI notifications. Ensure rollback mechanisms are in place for failed mutations.
+

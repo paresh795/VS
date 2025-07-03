@@ -1,4 +1,4 @@
-import { type InsertCustomer } from "../../schema/customers"
+import { type InsertCustomer } from "../../schema"
 
 // get this from your 1st user in clerk (dev mode)
 export const userId = "user_2y8Cx5ekKHYstsIdBVAj2ZYB6EV"

@@ -1,0 +1,142 @@
+# Task ID: 7
+# Title: Implement Chat Edit Functionality
+# Status: pending
+# Dependencies: 6
+# Priority: medium
+# Description: Create the inline chat edit feature that allows users to make targeted changes to staged images via natural language prompts.
+# Details:
+1. Create UI for selecting objects to edit
+   - Implement click-to-mask interface on staged image
+   - Add chat input for edit instructions
+2. Create API route for chat edits:
+   ```typescript
+   // pages/api/edit.ts
+   export default async function handler(req, res) {
+     const { user } = await getAuth(req);
+     if (!user) return res.status(401).json({ error: 'Unauthorized' });
+     
+     const { stagedImageUrl, maskCoordinates, editPrompt } = req.body;
+     
+     // Check and deduct credits
+     const { success } = await deductCredits(user.id, 3);
+     if (!success) return res.status(402).json({ error: 'Insufficient credits' });
+     
+     // Generate mask image from coordinates
+     const maskImageUrl = await generateMaskFromCoordinates(stagedImageUrl, maskCoordinates);
+     
+     // Format edit prompt
+     const formattedPrompt = `Replace ${getObjectDescription(maskCoordinates)} with ${editPrompt}; keep everything else unchanged.`;
+     
+     // Create job record
+     const job = await db.insert(jobs).values({
+       userId: user.id,
+       type: 'edit',
+       status: 'processing',
+       originalUrl: stagedImageUrl,
+       metadata: { editPrompt }
+     }).returning();
+     
+     // Call Replicate Flux Kontext-Pro API
+     const prediction = await replicate.run(
+       "black-forest-labs/flux-kontext-pro",
+       { 
+         input: {
+           input_image: getPublicUrl(stagedImageUrl),
+           mask_image: maskImageUrl,
+           prompt: formattedPrompt,
+           aspect_ratio: "match_input_image",
+           output_format: "jpg"
+         }
+       }
+     );
+     
+     // Update job with result
+     await db.update(jobs)
+       .set({ status: 'completed', resultUrl: prediction.output[0] })
+       .where(eq(jobs.id, job[0].id));
+     
+     return res.status(200).json({ 
+       jobId: job[0].id, 
+       editedImageUrl: prediction.output[0] 
+     });
+   }
+   ```
+3. Implement mask drawing tools
+   - Add brush and eraser tools for mask refinement
+   - Implement undo/redo functionality
+4. Add edit history to allow reverting changes
+
+# Test Strategy:
+1. Test edit functionality with various objects and prompts
+2. Verify mask generation accuracy
+3. Measure edit response time to ensure it meets the 4s requirement
+4. Test credit deduction logic
+5. Verify edit history and revert functionality
+6. Test with complex edits (color changes, object replacements, etc.)
+
+# Subtasks:
+## 1. Implement Click-to-Mask Interface [pending]
+### Dependencies: None
+### Description: Create the UI component that allows users to click on objects in the staged image to generate a mask for editing.
+### Details:
+1. Create a Canvas overlay component that sits on top of the staged image
+2. Implement click event handlers to capture coordinates
+3. Add visual feedback to show selected areas
+4. Store mask coordinates in state
+5. Create a toggle to enable/disable selection mode
+
+## 2. Develop Mask Drawing Tools [pending]
+### Dependencies: 7.1
+### Description: Implement brush and eraser tools for refining the mask selection with precision.
+### Details:
+1. Add tool selection UI (brush/eraser)
+2. Implement brush tool with adjustable size
+3. Implement eraser tool with adjustable size
+4. Create canvas drawing functionality for both tools
+5. Add visual indicators for current tool and size
+6. Ensure mask data updates correctly with drawing actions
+
+## 3. Create Undo/Redo Functionality [pending]
+### Dependencies: 7.2
+### Description: Implement history tracking for mask edits to allow users to undo and redo their selection changes.
+### Details:
+1. Create a history stack data structure
+2. Implement snapshot capture of mask state after each significant edit
+3. Add undo button that reverts to previous state
+4. Add redo button that applies previously undone changes
+5. Set appropriate history limits to manage memory usage
+6. Add keyboard shortcuts (Ctrl+Z, Ctrl+Y)
+
+## 4. Implement Chat Input for Edit Instructions [pending]
+### Dependencies: 7.1
+### Description: Create the natural language input interface for users to specify their edit instructions.
+### Details:
+1. Design and implement chat input UI component
+2. Add submit button and keyboard shortcut (Enter)
+3. Implement character counter with appropriate limits
+4. Create prompt formatting logic to combine selection context with user instructions
+5. Add loading state for when edit is processing
+6. Implement basic input validation
+
+## 5. Develop Edit API Integration [pending]
+### Dependencies: 7.1, 7.4
+### Description: Create the backend API route that processes edit requests using the Replicate Flux Kontext-Pro model.
+### Details:
+1. Implement the API route handler as outlined in the specification
+2. Create the generateMaskFromCoordinates function to convert user selections to mask images
+3. Implement getObjectDescription function to describe selected areas
+4. Set up proper error handling and response formatting
+5. Add request validation
+6. Implement timeout handling for long-running operations
+
+## 6. Implement Edit History Management [pending]
+### Dependencies: 7.5
+### Description: Create a system to track edit history at the image level, allowing users to revert to previous versions.
+### Details:
+1. Design a data structure to track edit history for each image
+2. Store each edit result with associated metadata (timestamp, prompt)
+3. Create UI to display edit history timeline
+4. Implement functionality to revert to any previous version
+5. Add option to branch edits from any history point
+6. Implement cleanup logic for unused history items
+

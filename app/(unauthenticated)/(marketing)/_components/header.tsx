@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { SelectCustomer } from "@/db/schema/customers"
+import { SelectCustomer } from "@/db/schema"
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
 import { Menu, Moon, Sun, X, Sparkles } from "lucide-react"
 import { useTheme } from "next-themes"

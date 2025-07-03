@@ -1,0 +1,76 @@
+# Task ID: 10
+# Title: Implement Analytics, Logging, and Error Handling
+# Status: pending
+# Dependencies: 1, 2, 3, 4, 5, 6, 7, 8, 9
+# Priority: medium
+# Description: Create comprehensive analytics, logging, and error handling systems to monitor performance, track usage, and ensure reliability.
+# Details:
+1. Implement Next.js middleware for latency tracking:
+   ```typescript
+   // middleware.ts
+   export function middleware(request) {
+     // Start timer
+     const start = Date.now();
+     
+     const response = NextResponse.next();
+     
+     // Calculate latency
+     const latencyMs = Date.now() - start;
+     
+     // Log latency for specific routes
+     if (request.nextUrl.pathname.startsWith('/api/')) {
+       console.log(`[${request.method}] ${request.nextUrl.pathname}: ${latencyMs}ms`);
+       
+       // Store in database for p95 calculations
+       if (['mask', 'empty', 'stage', 'edit'].some(route => 
+         request.nextUrl.pathname.includes(route))) {
+         db.insert(latencyLogs).values({
+           route: request.nextUrl.pathname,
+           latencyMs,
+           timestamp: new Date()
+         }).catch(err => console.error('Failed to log latency:', err));
+       }
+     }
+     
+     return response;
+   }
+   ```
+2. Implement error handling and retry logic for Replicate API calls:
+   ```typescript
+   async function callReplicateWithRetry(model, input, maxRetries = 3) {
+     let retries = 0;
+     while (retries < maxRetries) {
+       try {
+         return await replicate.run(model, { input });
+       } catch (error) {
+         if (error.response?.status === 429) {
+           // Rate limit hit, exponential backoff
+           const delay = Math.pow(2, retries) * 1000;
+           console.log(`Rate limited, retrying in ${delay}ms`);
+           await new Promise(resolve => setTimeout(resolve, delay));
+           retries++;
+         } else {
+           // Log other errors
+           console.error(`Replicate API error:`, error);
+           throw error;
+         }
+       }
+     }
+     throw new Error(`Failed after ${maxRetries} retries`);
+   }
+   ```
+3. Create dashboard for system metrics:
+   - Display p95 latency for each operation
+   - Show success/failure rates
+   - Track credit usage over time
+4. Implement webhook status polling for long-running jobs
+5. Add comprehensive error logging and monitoring
+
+# Test Strategy:
+1. Test latency tracking across all API routes
+2. Verify p95 calculation accuracy
+3. Test retry logic with simulated rate limits
+4. Verify error handling for various failure scenarios
+5. Test webhook polling mechanism
+6. Verify dashboard metrics accuracy
+7. Test system under load to ensure stability

@@ -1,4 +1,5 @@
 import { CheckoutRedirect } from "@/components/payments/checkout-redirect"
+import { StateProviders } from "@/components/providers/state-providers"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { TailwindIndicator } from "@/components/utility/tailwind-indicator"
 import { ClerkProvider } from "@clerk/nextjs"
@@ -19,8 +20,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Mckay's App Template",
-  description: "The easiest way to start your next project."
+  title: "Virtual Staging Pro - AI-Powered Real Estate Staging",
+  description: "Transform empty rooms into stunning staged spaces with AI. Professional virtual staging for real estate professionals."
 }
 
 export default function RootLayout({
@@ -34,6 +35,7 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
+          <StateProviders>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
             <TooltipProvider>
               {children}
@@ -43,6 +45,7 @@ export default function RootLayout({
               <Toaster />
             </TooltipProvider>
           </ThemeProvider>
+          </StateProviders>
         </body>
       </html>
     </ClerkProvider>

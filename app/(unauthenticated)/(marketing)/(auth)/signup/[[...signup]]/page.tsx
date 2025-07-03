@@ -206,11 +206,13 @@ export default function SignUpPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
           >
+            <div suppressHydrationWarning>
             <SignUp
               forceRedirectUrl="/dashboard"
               signInUrl="/login"
               appearance={{ baseTheme: theme === "dark" ? dark : undefined }}
             />
+            </div>
           </motion.div>
         </motion.div>
       </div>

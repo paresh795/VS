@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/db"
-import { customers, type SelectCustomer } from "@/db/schema/customers"
+import { customers, type SelectCustomer } from "@/db/schema"
 import { currentUser } from "@clerk/nextjs/server"
 import { eq } from "drizzle-orm"
 

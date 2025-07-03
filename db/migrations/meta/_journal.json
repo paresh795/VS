@@ -8,6 +8,34 @@
       "when": 1750112706924,
       "tag": "0000_flaky_vindicator",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1750690788602,
+      "tag": "0001_stale_dazzler",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1750691237215,
+      "tag": "0002_slim_the_enforcers",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1750693123288,
+      "tag": "0003_little_dragon_lord",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1750736732136,
+      "tag": "0004_brief_red_shift",
+      "breakpoints": true
     }
   ]
 }

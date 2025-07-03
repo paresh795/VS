@@ -59,9 +59,9 @@ export function VideoSection() {
                 <pre className="overflow-hidden">
                   <code>{`$ git clone github.com/mckaywrigley/template
 $ cd template
-$ npm install
+$ pnpm install
 $ cp .env.example .env.local
-$ npm run dev
+$ pnpm dev
 
 ✓ Ready in 3s
 ○ Compiling / ...

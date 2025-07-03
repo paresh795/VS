@@ -2,7 +2,8 @@
 
 import process from "process"
 import { db } from "../index"
-import { customers } from "../schema/customers"
+import postgres from "postgres"
+import { customers } from "../schema"
 import { customersData } from "./data/customers"
 
 async function seed() {

@@ -30,7 +30,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
+# env files - CRITICAL: All environment files with API keys
 .env*
 !.env.example
 
@@ -43,3 +43,97 @@ next-env.d.ts
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# ==============================================
+# VIRTUAL STAGING SAAS - SENSITIVE FILES
+# ==============================================
+
+# Environment Variables & API Keys
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug and Test Files
+debug-masks/
+debug-*
+test-*.log
+*.debug
+
+# Database & Storage
+*.db
+*.sqlite
+*.sqlite3
+supabase/.env*
+supabase/config.toml
+
+# AI Model Configurations with API Keys
+.cursor/mcp.json
+.roo/mcp.json
+.taskmaster/config.json
+
+# Scripts with potential sensitive data
+scripts/test-*.js
+scripts/*-debug.js
+scripts/*-authenticated.js
+
+# Logs that might contain sensitive data
+*.log
+logs/
+staging-*.log
+replicate-*.log
+
+# Temporary files that might contain URLs or keys
+temp/
+tmp/
+*.temp
+*.tmp
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Package manager files
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+
+# ==============================================
+# KEEP THESE PATTERNS AT THE END
+# ==============================================
+
+# Added by Task Master AI
+# Logs
+logs
+*.log
+dev-debug.log
+# Dependency directories
+node_modules/
+# Environment variables
+.env
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+
+# Task files
+# tasks.json
+# tasks/ 

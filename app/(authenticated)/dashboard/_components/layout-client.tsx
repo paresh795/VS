@@ -15,7 +15,9 @@ import {
   SidebarTrigger
 } from "@/components/ui/sidebar"
 import { usePathname } from "next/navigation"
+import { useEffect } from "react"
 import { AppSidebar } from "./app-sidebar"
+import { useCreditSync } from "@/lib/sync-credits"
 
 export default function DashboardClientLayout({
   children,
@@ -30,6 +32,9 @@ export default function DashboardClientLayout({
   }
 }) {
   const pathname = usePathname()
+  const { startPeriodicSync, stopPeriodicSync, forceSyncNow } = useCreditSync()
+
+  // Credit sync removed to prevent infinite loops - handled by individual components now
 
   // Read the sidebar state from cookie on initial load
   const getCookieValue = (name: string) => {

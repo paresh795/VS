@@ -248,11 +248,13 @@ export default function LoginPage() {
                 ease: "easeInOut"
               }}
             />
+            <div suppressHydrationWarning>
             <SignIn
               forceRedirectUrl="/dashboard"
               signUpUrl="/signup"
               appearance={{ baseTheme: theme === "dark" ? dark : undefined }}
             />
+            </div>
           </motion.div>
         </motion.div>
       </div>
