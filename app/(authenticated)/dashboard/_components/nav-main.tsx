@@ -2,12 +2,10 @@
 
 import {
   CreditCard,
-  Settings2,
-  Upload,
-  Zap,
-  TestTube,
-  Bug,
-  ChevronRight,
+  History,
+  Home,
+  Plus,
+  HelpCircle,
 } from "lucide-react"
 
 import {
@@ -30,17 +28,22 @@ import {
 // Main navigation items
 const items = [
   {
-    title: "Virtual Staging",
+    title: "Main Actions",
     items: [
       {
-        title: "New Staging",
-        url: "/dashboard/staging",
-        icon: Upload,
+        title: "Dashboard",
+        url: "/dashboard",
+        icon: Home,
       },
       {
-        title: "Upload Test",
-        url: "/dashboard/upload-test",
-        icon: TestTube,
+        title: "New Session",
+        url: "/dashboard/new",
+        icon: Plus,
+      },
+      {
+        title: "History",
+        url: "/dashboard/history",
+        icon: History,
       },
     ],
   },
@@ -53,19 +56,9 @@ const items = [
         icon: CreditCard,
       },
       {
-        title: "Billing",
-        url: "/dashboard/billing",
-        icon: CreditCard,
-      },
-    ],
-  },
-  {
-    title: "Debug",
-    items: [
-      {
-        title: "Auth Debug",
-        url: "/dashboard/auth-debug",
-        icon: Bug,
+        title: "Support",
+        url: "/dashboard/support",
+        icon: HelpCircle,
       },
     ],
   },

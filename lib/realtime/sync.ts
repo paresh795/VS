@@ -147,6 +147,10 @@ class RealTimeSyncManager {
       })
 
       if (!response.ok) {
+        // Don't log 401 errors as they're expected during auth state transitions
+        if (response.status === 401) {
+          return
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
       
@@ -274,6 +278,10 @@ class RealTimeSyncManager {
       })
       
       if (!response.ok) {
+        // Don't log 401 errors as they're expected during auth state transitions
+        if (response.status === 401) {
+          return
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
       
@@ -327,6 +335,10 @@ class RealTimeSyncManager {
     })
     
       if (!response.ok) {
+        // Don't log 401 errors as they're expected during auth state transitions
+        if (response.status === 401) {
+          return null
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
     
@@ -364,25 +376,30 @@ export const getSyncManager = (): RealTimeSyncManager => {
   return syncManagerInstance
 }
 
-// React hook for using real-time sync
+// React hook for using real-time sync with authentication awareness
 export const useRealTimeSync = (enabled = true) => {
   const syncManager = getSyncManager()
   
-  // Start/stop sync based on enabled state
-  if (typeof window !== 'undefined') {
-    if (enabled) {
-      syncManager.start()
-    } else {
-      syncManager.stop()
+  // Only run in browser environment
+  if (typeof window === 'undefined') {
+    return {
+      start: () => {},
+      stop: () => {},
+      syncNow: {
+        jobs: () => {},
+        credits: () => {},
+        health: () => {}
+      }
     }
   }
 
+  // This hook should only start sync when explicitly called by authenticated components
+  // We no longer auto-start here to prevent unauthorized API calls
+  
   // Cleanup on unmount
-  if (typeof window !== 'undefined') {
-    window.addEventListener('beforeunload', () => {
-      syncManager.stop()
-    })
-  }
+  window.addEventListener('beforeunload', () => {
+    syncManager.stop()
+  })
   
   return {
     start: () => syncManager.start(),

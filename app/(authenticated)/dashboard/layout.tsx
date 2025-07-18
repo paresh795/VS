@@ -2,6 +2,12 @@ import { getCustomerByUserId } from "@/actions/customers"
 import { currentUser } from "@clerk/nextjs/server"
 import { redirect } from "next/navigation"
 import DashboardClientLayout from "./_components/layout-client"
+import { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Virtual Staging Dashboard",
+  description: "Create professional virtual staging for real estate photos with AI-powered tools",
+}
 
 export default async function DashboardLayout({
   children

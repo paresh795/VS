@@ -15,9 +15,16 @@ import {
   SidebarTrigger
 } from "@/components/ui/sidebar"
 import { usePathname } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { AppSidebar } from "./app-sidebar"
 import { useCreditSync } from "@/lib/sync-credits"
+import { useAuth } from "@clerk/nextjs"
+import { useRealTimeSync } from "@/lib/realtime/sync"
+import { useSessionStore } from "@/lib/store/session-store"
+import { useCreditsStore } from "@/lib/store/credits-store"
+import { useJobsStore } from "@/lib/store/jobs-store"
+import { useAppStore } from "@/lib/store/app-store"
+import { clearAllUserData, setupAuthListeners } from "@/lib/store/middleware/auth-aware-persistence"
 
 export default function DashboardClientLayout({
   children,
@@ -33,8 +40,90 @@ export default function DashboardClientLayout({
 }) {
   const pathname = usePathname()
   const { startPeriodicSync, stopPeriodicSync, forceSyncNow } = useCreditSync()
+  const { isSignedIn, userId } = useAuth()
+  const realTimeSync = useRealTimeSync()
 
-  // Credit sync removed to prevent infinite loops - handled by individual components now
+  // Store reset functions
+  const resetSession = useSessionStore((state) => state.resetAll)
+  const resetCredits = useCreditsStore((state) => state.reset)
+  const resetJobs = useJobsStore((state) => state.reset)
+  const resetApp = useAppStore((state) => state.reset)
+  
+  // Track previous user ID to detect changes
+  const previousUserIdRef = useRef<string | null>(null)
+
+  // Setup auth listeners once
+  useEffect(() => {
+    setupAuthListeners()
+  }, [])
+
+  // Handle user authentication changes and cleanup
+  useEffect(() => {
+    const currentUserId = userId || null
+    const previousUserId = previousUserIdRef.current
+
+    console.log('🔄 [Layout] Auth state:', { 
+      isSignedIn, 
+      currentUserId, 
+      previousUserId 
+    })
+
+    // User switching detection
+    if (previousUserId && currentUserId && previousUserId !== currentUserId) {
+      console.log('🔄 [Layout] User switch detected:', { 
+        from: previousUserId, 
+        to: currentUserId 
+      })
+      
+      // Clear all stores and localStorage
+      resetSession()
+      resetCredits()
+      resetJobs()
+      resetApp()
+      clearAllUserData()
+      
+      // Force page reload to ensure clean state
+      setTimeout(() => {
+        window.location.reload()
+      }, 100)
+      
+      return
+    }
+
+    // User signed out
+    if (previousUserId && !currentUserId) {
+      console.log('🛑 [Layout] User signed out, clearing all data')
+      
+      resetSession()
+      resetCredits()
+      resetJobs()
+      resetApp()
+      clearAllUserData()
+      
+      stopPeriodicSync()
+      realTimeSync.stop()
+    }
+
+    // User signed in (first time or after sign out)
+    if (!previousUserId && currentUserId && isSignedIn) {
+      console.log('🚀 [Layout] User signed in, starting all sync processes.')
+      
+      // Start sync processes
+      startPeriodicSync()
+      realTimeSync.start()
+    }
+
+    // Update tracking
+    previousUserIdRef.current = currentUserId
+
+    // Cleanup function for component unmount
+    return () => {
+      if (!isSignedIn) {
+      stopPeriodicSync()
+      realTimeSync.stop()
+    }
+    }
+  }, [isSignedIn, userId, startPeriodicSync, stopPeriodicSync, realTimeSync, resetSession, resetCredits, resetJobs, resetApp])
 
   // Read the sidebar state from cookie on initial load
   const getCookieValue = (name: string) => {

@@ -12,13 +12,7 @@ export default async function MarketingLayout({
 }) {
   return (
     <>
-      <SiteBanner />
-      <HeaderWrapper />
       {children}
-      <Footer />
-      <StickyCTA />
-      <ScrollIndicator />
-      <RedirectToast />
     </>
   )
 }

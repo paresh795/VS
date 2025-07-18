@@ -1,7 +1,8 @@
 // Credits Store - Professional Credit Management
 import { create } from 'zustand'
-import { devtools, persist } from 'zustand/middleware'
+import { devtools } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
+import { createAuthAwarePersist } from './middleware/auth-aware-persistence'
 import { CreditsState, CreditTransaction } from './types'
 
 // Credits store actions
@@ -16,8 +17,6 @@ interface CreditsActions {
   confirmPendingDeduction: (amount: number) => void
   clearPendingDeductions: () => void
   
-  // API sync methods - removed to prevent hydration issues
-  
   // Transaction management
   addTransaction: (transaction: Omit<CreditTransaction, 'id' | 'createdAt'>) => void
   getTransactionHistory: () => CreditTransaction[]
@@ -30,21 +29,33 @@ interface CreditsActions {
   reset: () => void
 }
 
-export interface CreditsStore extends CreditsState, CreditsActions {}
-
-// Initial state
-const initialState: CreditsState = {
-  balance: 0,
-  transactions: [],
-  isLoading: false,
-  lastUpdated: null,
-  pendingDeductions: 0
+type CreditsStore = CreditsState & CreditsActions & {
+  _currentUserId?: string | null
 }
 
-// Credits store implementation
+// Initial state
+const initialState: CreditsState & { _currentUserId?: string | null } = {
+  _currentUserId: null,
+  balance: 0,
+  pendingDeductions: 0,
+  transactions: [],
+  isLoading: false,
+  lastUpdated: null
+}
+
+const authAwarePersist = createAuthAwarePersist<CreditsStore>({
+  name: 'credits-store',
+  partialize: (state) => ({
+    balance: state.balance,
+    transactions: state.transactions.slice(0, 50), // Persist only recent transactions
+    lastUpdated: state.lastUpdated,
+    pendingDeductions: state.pendingDeductions
+  }),
+})
+
 export const useCreditsStore = create<CreditsStore>()(
   devtools(
-    persist(
+    authAwarePersist(
       immer((set, get) => ({
         ...initialState,
 
@@ -53,65 +64,51 @@ export const useCreditsStore = create<CreditsStore>()(
           set((state) => {
             state.balance = balance
             state.lastUpdated = new Date()
-            state.isLoading = false
-            // Clear pending deductions when server confirms balance
-            state.pendingDeductions = 0
           })
         },
 
-        // API sync methods removed to prevent hydration issues
-        // Use external creditSync service instead
-
-        deductCredits: (amount: number, jobId?: string, description = 'Credit deduction') => {
-          const currentBalance = get().balance
-          
-          if (currentBalance < amount) {
-            throw new Error('Insufficient credits')
-          }
-
+        deductCredits: (amount: number, jobId?: string, description?: string) => {
           set((state) => {
-            state.balance -= amount
-            state.lastUpdated = new Date()
-            state.pendingDeductions += amount // Track as pending
+            const previousBalance = state.balance
+            state.balance = Math.max(0, state.balance - amount)
             
             // Add transaction record
             const transaction: CreditTransaction = {
               id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              userId: '', // Will be set from auth context
               amount: -amount,
               type: 'debit',
+              description: description || `Credits used${jobId ? ` for job ${jobId}` : ''}`,
               jobId,
-              description,
               createdAt: new Date()
             }
             
             state.transactions.unshift(transaction)
+            state.lastUpdated = new Date()
             
-            // Keep only last 100 transactions for performance
+            // Keep only last 100 transactions
             if (state.transactions.length > 100) {
               state.transactions = state.transactions.slice(0, 100)
             }
           })
         },
 
-        addCredits: (amount: number, description = 'Credit addition') => {
+        addCredits: (amount: number, description?: string) => {
           set((state) => {
             state.balance += amount
-            state.lastUpdated = new Date()
             
             // Add transaction record
             const transaction: CreditTransaction = {
               id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              userId: '', // Will be set from auth context
               amount,
-              type: 'credit',
-              description,
+              type: 'purchase',
+              description: description || 'Credits purchased',
               createdAt: new Date()
             }
             
             state.transactions.unshift(transaction)
+            state.lastUpdated = new Date()
             
-            // Keep only last 100 transactions for performance
+            // Keep only last 100 transactions
             if (state.transactions.length > 100) {
               state.transactions = state.transactions.slice(0, 100)
             }
@@ -179,15 +176,6 @@ export const useCreditsStore = create<CreditsStore>()(
           })
         }
       })),
-      {
-        name: 'credits-store',
-        partialize: (state) => ({
-          balance: state.balance,
-          transactions: state.transactions.slice(0, 50), // Persist only recent transactions
-          lastUpdated: state.lastUpdated,
-          pendingDeductions: state.pendingDeductions
-        })
-      }
     ),
     {
       name: 'credits-store'
@@ -195,26 +183,18 @@ export const useCreditsStore = create<CreditsStore>()(
   )
 )
 
-// Selector hooks for optimized re-renders
+// Selectors for easy state access
 export const useCreditsBalance = () => useCreditsStore((state) => state.balance)
+export const usePendingDeductions = () => useCreditsStore((state) => state.pendingDeductions)
 export const useCreditsLoading = () => useCreditsStore((state) => state.isLoading)
-export const useRecentTransactions = (limit = 10) => 
-  useCreditsStore((state) => state.transactions.slice(0, limit))
+export const useCreditsTransactions = () => useCreditsStore((state) => state.transactions)
+export const useCreditsLastUpdated = () => useCreditsStore((state) => state.lastUpdated)
 
 // Computed selectors
-export const useCanAfford = (amount: number) => 
-  useCreditsStore((state) => state.balance >= amount)
+export const useAvailableCredits = () => useCreditsStore((state) => 
+  Math.max(0, state.balance - state.pendingDeductions)
+)
 
-// Fixed: Use individual selectors instead of creating new objects
-export const useCreditsStatus = () => {
-  const balance = useCreditsStore((state) => state.balance)
-  const isLoading = useCreditsStore((state) => state.isLoading)
-  const lastUpdated = useCreditsStore((state) => state.lastUpdated)
-  
-  return {
-    balance,
-    isLoading,
-    lastUpdated,
-    canAfford: (amount: number) => balance >= amount
-  }
-} 
+export const useCanAfford = (amount: number) => useCreditsStore((state) => 
+  (state.balance - state.pendingDeductions) >= amount
+) 

@@ -8,6 +8,9 @@ import { ThemeProvider } from "next-themes"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Toaster } from "sonner"
 import "./globals.css"
+import { Manrope } from "next/font/google"
+import localFont from "next/font/local"
+import { cn } from "@/lib/utils"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,6 +20,17 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"]
+})
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-manrope",
+})
+
+const futura = localFont({
+  src: "../public/fonts/Futura-Condensed-Extra-Bold.ttf",
+  variable: "--font-futura",
 })
 
 export const metadata: Metadata = {
@@ -31,9 +45,12 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
+      <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${manrope.variable} ${futura.variable} font-manrope`}>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+          className={cn(
+            "min-h-screen bg-background font-sans antialiased",
+            "dark"
+          )}
         >
           <StateProviders>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem>

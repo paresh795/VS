@@ -1,5 +1,5 @@
 import { db } from "@/db"
-import { users } from "@/db/schema"
+import { users, customers } from "@/db/schema"
 import { initializeCredits } from "@/lib/credits"
 import { Webhook } from "svix"
 import { headers } from "next/headers"
@@ -68,8 +68,26 @@ export async function POST(req: Request) {
     const { id, email_addresses, first_name, last_name, image_url } = evt.data
 
     try {
-      // Create user in database
-      await db.insert(users).values({
+      console.log(`🔄 [Webhook] Processing user.created for: ${id}`)
+      
+      // Check if user already exists (IDEMPOTENT CHECK)
+      const existingUser = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkId, id))
+        .limit(1)
+
+      if (existingUser.length > 0) {
+        console.log(`ℹ️ [Webhook] User ${id} already exists, skipping creation`)
+        return new Response("User already exists", { status: 200 })
+      }
+
+      console.log(`🔄 [Webhook] Creating new user records for: ${id}`)
+      
+      // Use transaction to ensure atomicity
+      await db.transaction(async (tx) => {
+        // Create user in users table
+        await tx.insert(users).values({
         clerkId: id,
         email: email_addresses?.[0]?.email_address || "",
         firstName: first_name || null,
@@ -77,13 +95,27 @@ export async function POST(req: Request) {
         imageUrl: image_url || null,
       })
 
+        // Create customer record for billing/subscription
+        await tx.insert(customers).values({
+          userId: id, // Use Clerk ID directly
+          membership: "free", // Default membership
+        })
+
       // Initialize credits for new user
       await initializeCredits(id)
+      })
 
-      console.log("User created successfully:", id)
+      console.log(`✅ [Webhook] User created successfully: ${id}`)
     } catch (error) {
-      console.error("Error creating user:", error)
-      return new Response("Error creating user", { status: 500 })
+      console.error(`❌ [Webhook] Error processing user ${id}:`, error)
+      
+      // More granular error handling
+      if (error instanceof Error && error.message.includes('duplicate key')) {
+        console.log(`ℹ️ [Webhook] User ${id} was created by another process, continuing`)
+        return new Response("User already exists", { status: 200 })
+      }
+      
+      return new Response("Error processing user", { status: 500 })
     }
   }
 
@@ -103,9 +135,9 @@ export async function POST(req: Request) {
         })
         .where(eq(users.clerkId, id))
 
-      console.log("User updated successfully:", id)
+      console.log(`✅ [Webhook] User updated successfully: ${id}`)
     } catch (error) {
-      console.error("Error updating user:", error)
+      console.error(`❌ [Webhook] Error updating user ${id}:`, error)
       return new Response("Error updating user", { status: 500 })
     }
   }
@@ -116,10 +148,11 @@ export async function POST(req: Request) {
     try {
       // Delete user from database (cascade will handle related data)
       await db.delete(users).where(eq(users.clerkId, id))
+      await db.delete(customers).where(eq(customers.userId, id))
 
-      console.log("User deleted successfully:", id)
+      console.log(`✅ [Webhook] User deleted successfully: ${id}`)
     } catch (error) {
-      console.error("Error deleting user:", error)
+      console.error(`❌ [Webhook] Error deleting user ${id}:`, error)
       return new Response("Error deleting user", { status: 500 })
     }
   }

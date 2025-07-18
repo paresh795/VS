@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createAuthAwarePersist } from './middleware/auth-aware-persistence'
 import { SelectSession, SelectGeneration } from '@/db/schema'
 
 // Enhanced types for the session workflow
@@ -16,20 +16,14 @@ export interface EmptyRoomGeneration {
 
 export interface StagingGeneration {
   id: string
-  generationNumber: number
-  inputImageUrl: string
-  outputImageUrls: string[]
+  emptyRoomUrl: string
   style: string
   roomType: string
+  outputImageUrls: string[]
   creditsCost: number
   status: 'pending' | 'processing' | 'completed' | 'failed'
   errorMessage?: string
   createdAt: Date
-}
-
-export interface SessionWithGenerations extends SelectSession {
-  emptyRoomGenerations: EmptyRoomGeneration[]
-  stagingGenerations: StagingGeneration[]
 }
 
 export interface StagingConfig {
@@ -37,7 +31,14 @@ export interface StagingConfig {
   roomType: string
 }
 
+export interface SessionWithGenerations extends SelectSession {
+  emptyRoomGenerations: EmptyRoomGeneration[]
+  stagingGenerations: StagingGeneration[]
+}
+
 interface SessionState {
+  _currentUserId?: string | null // Add auth tracking
+  
   // Current session
   currentSession: SessionWithGenerations | null
   
@@ -46,6 +47,10 @@ interface SessionState {
   selectedEmptyRoomUrl: string | null
   emptyRoomRetries: number
   maxEmptyRoomRetries: number
+  
+  // Paid retry system
+  paidRetryAttempts: number
+  allowPaidRetries: boolean
   
   // Staging generation state
   stagingGenerations: StagingGeneration[]
@@ -56,32 +61,26 @@ interface SessionState {
   isLoadingHistory: boolean
   
   // UI state
-  currentStep: 'upload' | 'room_state' | 'empty_room' | 'staging' | 'complete'
+  currentStep: 'upload' | 'room_state' | 'empty_room' | 'staging'
   isGenerating: boolean
   
-  // Actions
+  // Actions (same as before)
   createSession: (originalImageUrl: string, roomStateChoice: 'already_empty' | 'generate_empty') => Promise<void>
   setCurrentSession: (session: SessionWithGenerations | null) => void
-  
-  // Empty room actions
   addEmptyRoomGeneration: (generation: EmptyRoomGeneration) => void
   selectEmptyRoom: (url: string) => void
   incrementEmptyRoomRetries: () => void
   resetEmptyRoomRetries: () => void
-  
-  // Staging actions
+  incrementPaidRetryAttempts: () => void
+  resetPaidRetryAttempts: () => void
+  canAffordPaidRetry: (creditBalance: number) => boolean
+  getTotalAttempts: () => number
   addStagingGeneration: (generation: StagingGeneration) => void
   updateStagingConfig: (config: Partial<StagingConfig>) => void
-  
-  // History actions
   loadSessionHistory: () => Promise<void>
   addToHistory: (session: SessionWithGenerations) => void
-  
-  // Navigation actions
   setCurrentStep: (step: SessionState['currentStep']) => void
   setIsGenerating: (generating: boolean) => void
-  
-  // Reset actions
   resetCurrentSession: () => void
   resetAll: () => void
 }
@@ -91,15 +90,35 @@ const defaultStagingConfig: StagingConfig = {
   roomType: 'living_room'
 }
 
+const authAwarePersist = createAuthAwarePersist<SessionState>({
+  name: 'session-store',
+  partialize: (state) => ({
+    // Persist essential workflow state
+    currentSession: state.currentSession,
+    emptyRoomGenerations: state.emptyRoomGenerations,
+    selectedEmptyRoomUrl: state.selectedEmptyRoomUrl,
+    emptyRoomRetries: state.emptyRoomRetries,
+    paidRetryAttempts: state.paidRetryAttempts,
+    allowPaidRetries: state.allowPaidRetries,
+    stagingGenerations: state.stagingGenerations,
+    stagingConfig: state.stagingConfig,
+    allSessions: state.allSessions,
+    currentStep: state.currentStep
+  }),
+})
+
 export const useSessionStore = create<SessionState>()(
-  persist(
+  authAwarePersist(
     (set, get) => ({
       // Initial state
+      _currentUserId: null,
       currentSession: null,
       emptyRoomGenerations: [],
       selectedEmptyRoomUrl: null,
       emptyRoomRetries: 0,
       maxEmptyRoomRetries: 2,
+      paidRetryAttempts: 0,
+      allowPaidRetries: true,
       stagingGenerations: [],
       stagingConfig: defaultStagingConfig,
       allSessions: [],
@@ -107,7 +126,7 @@ export const useSessionStore = create<SessionState>()(
       currentStep: 'upload',
       isGenerating: false,
 
-      // Actions
+      // Actions (all your existing actions remain the same)
       createSession: async (originalImageUrl: string, roomStateChoice: 'already_empty' | 'generate_empty') => {
         try {
           console.log('🎬 [Session Store] Creating session...', { originalImageUrl, roomStateChoice })
@@ -128,7 +147,6 @@ export const useSessionStore = create<SessionState>()(
           const responseData = await response.json()
           console.log('✅ [Session Store] API Response:', responseData)
           
-          // Extract the actual session from the response
           const session = responseData.session
           console.log('✅ [Session Store] Session data:', session)
           
@@ -165,11 +183,21 @@ export const useSessionStore = create<SessionState>()(
         }
       },
 
+      // ... rest of your actions remain exactly the same ...
+
       setCurrentSession: (session) => {
         set({ currentSession: session })
       },
 
       addEmptyRoomGeneration: (generation) => {
+        console.log('🔧 [Session Store] addEmptyRoomGeneration called with:', generation.id)
+        console.log('🔧 [Session Store] About to call set() - this should trigger interceptedSet')
+        
+        // IMMEDIATE DEBUG: Check localStorage before and after
+        const userKey = `session-store_user_${get()._currentUserId}`
+        const beforeValue = typeof window !== 'undefined' ? window.localStorage.getItem(userKey) : null
+        console.log('🔍 [DEBUG] Before set - localStorage value:', beforeValue)
+        
         set((state) => ({
           emptyRoomGenerations: [...state.emptyRoomGenerations, generation],
           currentSession: state.currentSession ? {
@@ -177,6 +205,28 @@ export const useSessionStore = create<SessionState>()(
             emptyRoomGenerations: [...state.currentSession.emptyRoomGenerations, generation]
           } : null
         }))
+        
+        console.log('🔧 [Session Store] set() call completed')
+        
+        // IMMEDIATE DEBUG: Force save to localStorage manually
+        setTimeout(() => {
+          const currentState = get()
+          const afterValue = typeof window !== 'undefined' ? window.localStorage.getItem(userKey) : null
+          console.log('🔍 [DEBUG] After set - localStorage value:', afterValue)
+          console.log('🔍 [DEBUG] Current state emptyRoomGenerations count:', currentState.emptyRoomGenerations.length)
+          
+          // FORCE MANUAL SAVE
+          if (typeof window !== 'undefined') {
+            const manualSave = JSON.stringify({
+              emptyRoomGenerations: currentState.emptyRoomGenerations,
+              stagingGenerations: currentState.stagingGenerations,
+              currentSession: currentState.currentSession,
+              _currentUserId: currentState._currentUserId
+            })
+            window.localStorage.setItem(userKey, manualSave)
+            console.log('💾 [DEBUG] MANUALLY SAVED TO LOCALSTORAGE:', userKey)
+          }
+        }, 100)
       },
 
       selectEmptyRoom: (url) => {
@@ -199,14 +249,48 @@ export const useSessionStore = create<SessionState>()(
         set({ emptyRoomRetries: 0 })
       },
 
-      addStagingGeneration: (generation) => {
+      incrementPaidRetryAttempts: () => {
         set((state) => ({
-          stagingGenerations: [...state.stagingGenerations, generation],
-          currentSession: state.currentSession ? {
-            ...state.currentSession,
-            stagingGenerations: [...state.currentSession.stagingGenerations, generation]
-          } : null
+          paidRetryAttempts: state.paidRetryAttempts + 1
         }))
+      },
+
+      resetPaidRetryAttempts: () => {
+        set({ paidRetryAttempts: 0 })
+      },
+
+      canAffordPaidRetry: (creditBalance: number) => {
+        return creditBalance >= 10; // MASK_AND_EMPTY cost from constants
+      },
+
+      getTotalAttempts: () => {
+        return get().paidRetryAttempts;
+      },
+
+      addStagingGeneration: (generation) => {
+        set((state) => {
+          const newState = {
+            stagingGenerations: [...state.stagingGenerations, generation],
+            currentSession: state.currentSession ? {
+              ...state.currentSession,
+              stagingGenerations: [...state.currentSession.stagingGenerations, generation]
+            } : null,
+            allSessions: state.allSessions
+          }
+          
+          // Auto-save session when staging generation is completed
+          if (generation.status === 'completed' && state.currentSession) {
+            console.log('✅ [Session Store] Auto-saving completed staging generation')
+            // Add to session history
+            const updatedSession = {
+              ...state.currentSession,
+              stagingGenerations: [...state.currentSession.stagingGenerations, generation]
+            }
+            newState.allSessions = [updatedSession, ...state.allSessions.filter(s => s.id !== updatedSession.id)]
+          }
+          
+          return newState
+        })
       },
 
       updateStagingConfig: (config) => {
@@ -251,6 +335,8 @@ export const useSessionStore = create<SessionState>()(
           emptyRoomGenerations: [],
           selectedEmptyRoomUrl: null,
           emptyRoomRetries: 0,
+          paidRetryAttempts: 0,
+          allowPaidRetries: true,
           stagingGenerations: [],
           stagingConfig: defaultStagingConfig,
           currentStep: 'upload',
@@ -264,6 +350,9 @@ export const useSessionStore = create<SessionState>()(
           emptyRoomGenerations: [],
           selectedEmptyRoomUrl: null,
           emptyRoomRetries: 0,
+          maxEmptyRoomRetries: 2,
+          paidRetryAttempts: 0,
+          allowPaidRetries: true,
           stagingGenerations: [],
           stagingConfig: defaultStagingConfig,
           allSessions: [],
@@ -272,86 +361,7 @@ export const useSessionStore = create<SessionState>()(
           isGenerating: false
         })
       }
-    }),
-    {
-      name: 'session-store',
-      partialize: (state) => ({
-        // Persist essential workflow state
-        currentSession: state.currentSession,
-        emptyRoomGenerations: state.emptyRoomGenerations,
-        selectedEmptyRoomUrl: state.selectedEmptyRoomUrl,
-        emptyRoomRetries: state.emptyRoomRetries,
-        stagingGenerations: state.stagingGenerations,
-        stagingConfig: state.stagingConfig,
-        allSessions: state.allSessions,
-        currentStep: state.currentStep
-      }),
-      onRehydrateStorage: () => (state) => {
-        console.log('🔄 [Session Store] Starting rehydration with state:', state ? {
-          hasCurrentSession: !!state.currentSession,
-          currentStep: state.currentStep,
-          sessionKeys: state.currentSession ? Object.keys(state.currentSession) : [],
-          sessionId: state.currentSession?.id,
-          originalImageUrl: state.currentSession?.originalImageUrl
-        } : 'null')
-        
-        if (state) {
-          // Validate session integrity
-          const hasCorruptedSession = state.currentSession && (
-            !state.currentSession.id || 
-            !state.currentSession.originalImageUrl ||
-            typeof state.currentSession.id !== 'string'
-          )
-          
-          console.log('🔍 [Session Store] Corruption check:', {
-            hasCurrentSession: !!state.currentSession,
-            hasId: state.currentSession ? !!state.currentSession.id : false,
-            hasOriginalImageUrl: state.currentSession ? !!state.currentSession.originalImageUrl : false,
-            idType: state.currentSession ? typeof state.currentSession.id : 'n/a',
-            hasCorruptedSession
-          })
-          
-          if (hasCorruptedSession) {
-            console.warn('🚨 [Session Store] Corrupted session detected, resetting state:', {
-              sessionId: state.currentSession?.id,
-              hasOriginalImageUrl: !!state.currentSession?.originalImageUrl,
-              sessionKeys: state.currentSession ? Object.keys(state.currentSession) : []
-            })
-            
-            const resetState = {
-              currentSession: null,
-              emptyRoomGenerations: [],
-              selectedEmptyRoomUrl: null,
-              emptyRoomRetries: 0,
-              maxEmptyRoomRetries: 2,
-              stagingGenerations: [],
-              stagingConfig: defaultStagingConfig,
-              allSessions: state.allSessions || [],
-              isLoadingHistory: false,
-              currentStep: 'upload' as SessionState['currentStep'],
-              isGenerating: false
-            }
-            
-            console.log('✅ [Session Store] Returning reset state:', {
-              currentStep: resetState.currentStep,
-              hasCurrentSession: !!resetState.currentSession
-            })
-            
-            return resetState
-          }
-          
-          console.log('🔄 [Session Store] Rehydrating session state:', {
-            sessionId: state.currentSession?.id,
-            currentStep: state.currentStep,
-            emptyRoomGenerations: state.emptyRoomGenerations?.length || 0,
-            selectedEmptyRoomUrl: state.selectedEmptyRoomUrl ? 'Yes' : 'No'
-          })
-        }
-        
-        console.log('✅ [Session Store] Rehydration complete, returning original state')
-        return state
-      }
-    }
+    })
   )
 )
 
@@ -366,4 +376,16 @@ export const useIsGenerating = () => useSessionStore((state) => state.isGenerati
 export const useSessionHistory = () => useSessionStore((state) => state.allSessions)
 export const useCanRetryEmptyRoom = () => useSessionStore((state) => 
   state.emptyRoomRetries < state.maxEmptyRoomRetries
+)
+
+// Paid retry selectors
+export const usePaidRetryAttempts = () => useSessionStore((state) => state.paidRetryAttempts)
+export const useCanAffordPaidRetry = (creditBalance: number) => useSessionStore((state) => 
+  state.canAffordPaidRetry(creditBalance)
+)
+export const useHasExhaustedFreeRetries = () => useSessionStore((state) => 
+  state.emptyRoomRetries >= state.maxEmptyRoomRetries
+)
+export const getTotalEmptyRoomAttempts = () => useSessionStore((state) => 
+  state.emptyRoomRetries + state.paidRetryAttempts + 1 // +1 for initial attempt
 ) 

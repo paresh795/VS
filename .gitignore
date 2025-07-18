@@ -97,6 +97,26 @@ tmp/
 *.swo
 *~
 
+# Other AI Assistant IDE configurations (exclude all except .cursor)
+.claude/
+.clinerules/
+.gemini/
+.github/instructions/
+.roo/
+.taskmaster/
+.trae/
+.windsurf/
+
+# Local documentation and project files (do not push to GitHub)
+.roomodes
+.windsurfrules
+API_IMPLEMENTATION_LESSONS.md
+AGENTS.md
+PRD-VS.txt
+PRD-VS-V2.md
+PRODUCTION_ROADMAP.md
+STAGING_IMPLEMENTATION_GUIDE.md
+
 # OS specific files
 .DS_Store
 .DS_Store?

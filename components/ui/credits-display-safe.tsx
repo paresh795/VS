@@ -34,26 +34,49 @@ export function SafeCreditsDisplay({
     setIsMounted(true)
   }, [])
 
-  // Initial load - sync with server  
+  // Initial load - sync with server (with auth timing protection)
   useEffect(() => {
     if (isMounted && isSignedIn) {
-      syncCreditsWithServer()
+      // Add a small delay to ensure authentication state is fully propagated
+      const timer = setTimeout(() => {
+        syncCreditsWithServer()
+      }, 500) // 500ms delay to ensure auth is ready
+      
+      return () => clearTimeout(timer)
     }
   }, [isMounted, isSignedIn])
 
-  const syncCreditsWithServer = async () => {
+  const syncCreditsWithServer = async (retryCount = 0) => {
     if (isLoading) return
     
     setLoading(true)
+    let caughtError: any = null
+    
     try {
       const serverBalance = await syncCredits()
       setBalance(serverBalance)
-    } catch (error) {
+    } catch (error: any) {
+      caughtError = error
       console.error('[Safe Credits Display] Sync failed:', error)
+      
+      // If it's a 401 error and we haven't retried too many times, retry with backoff
+      if (error?.message?.includes('401') && retryCount < 3) {
+        console.log(`[Safe Credits Display] Retrying after 401 error (attempt ${retryCount + 1}/3)`)
+        setLoading(false) // Reset loading state for retry
+        
+        // Exponential backoff: 1s, 2s, 4s
+        const retryDelay = Math.pow(2, retryCount) * 1000
+        setTimeout(() => {
+          syncCreditsWithServer(retryCount + 1)
+        }, retryDelay)
+        return
+      }
     } finally {
-      setLoading(false)
+      if (retryCount === 0 || !caughtError?.message?.includes('401')) {
+        setLoading(false)
       }
     }
+  }
 
   const handleAddCredits = async (amount: number = 100) => {
     if (process.env.NODE_ENV !== 'development') {

@@ -1,6 +1,6 @@
 'use client'
 
-// State Management Providers - Professional Integration
+// State Management Providers - Professional Integration with Auth Cleanup
 import React, { useEffect, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
@@ -9,12 +9,61 @@ import { useAppStore } from '@/lib/store/app-store'
 import { useCreditsStore } from '@/lib/store/credits-store'
 import { useJobsStore } from '@/lib/store/jobs-store'
 import { useErrorStore } from '@/lib/store/error-store'
+import { useSessionStore } from '@/lib/store/session-store'
 import { persistenceUtils } from '@/lib/store/middleware/persistence'
+import { clearAllUserData } from '@/lib/store/middleware/auth-aware-persistence'
 import { ErrorSeverity } from '@/lib/store/types'
 import { useRealTimeSync } from '@/lib/realtime/sync'
+import { useAuth } from '@clerk/nextjs'
 
 interface StateProvidersProps {
   children: React.ReactNode
+}
+
+// Global auth state cleanup component
+const AuthStateManager: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isSignedIn, userId } = useAuth()
+  const [previousUserId, setPreviousUserId] = useState<string | null>(null)
+  
+  // Store reset functions
+  const resetSession = useSessionStore((state) => state.resetAll)
+  const resetCredits = useCreditsStore((state) => state.reset)
+  const resetJobs = useJobsStore((state) => state.reset)
+  const resetApp = useAppStore((state) => state.reset)
+  const resetErrors = useErrorStore((state) => state.reset)
+
+  useEffect(() => {
+    // Handle user changes
+    if (previousUserId && userId && previousUserId !== userId) {
+      console.log('🔄 [Auth Manager] User switch detected - clearing state')
+      
+      // Clear all stores
+      resetSession()
+      resetCredits()
+      resetJobs()
+      resetApp()
+      resetErrors()
+      
+      // Clear localStorage
+      clearAllUserData()
+    }
+    
+    // Handle sign out
+    if (previousUserId && !isSignedIn) {
+      console.log('🛑 [Auth Manager] User signed out - clearing all data')
+      
+      resetSession()
+      resetCredits()
+      resetJobs()
+      resetApp()
+      resetErrors()
+      clearAllUserData()
+    }
+    
+    setPreviousUserId(userId || null)
+  }, [isSignedIn, userId, previousUserId, resetSession, resetCredits, resetJobs, resetApp, resetErrors])
+
+  return <>{children}</>
 }
 
 // App initialization component
@@ -93,8 +142,8 @@ const StoreSynchronizer: React.FC<{ children: React.ReactNode }> = ({ children }
   const setOnline = useAppStore((state) => state.setOnline)
   const updateSyncTime = useAppStore((state) => state.updateSyncTime)
   
-  // Enable real-time synchronization
-  useRealTimeSync(true)
+  // Initialize sync hook (but don't auto-start - will be started by authenticated components)
+  useRealTimeSync(false)
 
   useEffect(() => {
     // Set up online/offline detection
@@ -213,11 +262,13 @@ export const StateProviders: React.FC<StateProvidersProps> = ({ children }) => {
   return (
     <StateErrorBoundary>
       <QueryClientProvider client={queryClient}>
+        <AuthStateManager>
         <StoreSynchronizer>
           <AppInitializer>
             {children}
           </AppInitializer>
         </StoreSynchronizer>
+        </AuthStateManager>
         {/* React Query DevTools - only in development */}
         {process.env.NODE_ENV === 'development' && (
           <ReactQueryDevtools 
